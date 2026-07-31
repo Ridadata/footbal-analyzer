@@ -192,13 +192,15 @@ already running) and opens the web dashboard in your browser.
 
 ## Screenshots
 
-> Add screenshots of the desktop login screen, stats GUI, and web dashboard here.
-
-| Desktop App | Web Dashboard |
+| Desktop App — Login | Desktop App — Stats & Charts |
 |---|---|
-| ![Desktop screenshot placeholder](docs/media/charts/radar_chart_example.png) | ![Web dashboard placeholder](docs/media/charts/possession_pie_chart.png) |
+| ![Desktop login screen](docs/media/screenshots/desktop-login.png) | ![Desktop stats GUI with a top scorers chart](docs/media/screenshots/desktop-stats.png) |
 
-Sample generated charts are available in [`docs/media/charts/`](docs/media/charts/), and a sample
+| Web Dashboard — Home | Web Dashboard — Match Visualizations |
+|---|---|
+| ![Web dashboard home page](docs/media/screenshots/web-home.png) | ![Web dashboard match visualizations tab](docs/media/screenshots/web-match-visualizations.png) |
+
+More sample generated charts are available in [`docs/media/charts/`](docs/media/charts/), and a sample
 generated dashboard is available in [`football_live_match/match_insights/`](football_live_match/match_insights/).
 
 ---
