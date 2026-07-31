@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Football Data Visualization{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h2>Live Football Match Insights</h2>
+    <p>Get real-time data and visualizations for football matches happening right now.</p>
+</section>
+
+<section class="search-section">
+    <h3>Find Live Matches</h3>
+    
+    <div class="search-options">
+        <div class="option-card">
+            <h4>View All Live Matches</h4>
+            <p>See all matches currently being played across all leagues.</p>
+            <a href="/live-matches" class="button">View Live Matches</a>
+        </div>
+        
+        <div class="option-card">
+            <h4>Search by League</h4>
+            <p>Find live matches in a specific league.</p>
+            <form id="league-search-form" action="/league-search" method="get">
+                <select id="league-select" name="league_id" required>
+                    <option value="">-- Select a League --</option>
+                    {% for league in leagues %}
+                    <option value="{{ league.id }}">{{ league.name }} ({{ league.country }})</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="button">Search</button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<section class="features">
+    <h3>Features</h3>
+    <div class="feature-grid">
+        <div class="feature-card">
+            <h4>Live Match Data</h4>
+            <p>Get real-time updates on scores, events, and statistics.</p>
+        </div>
+        <div class="feature-card">
+            <h4>Interactive Visualizations</h4>
+            <p>View match data through intuitive charts and graphs.</p>
+        </div>
+        <div class="feature-card">
+            <h4>Team Comparisons</h4>
+            <p>Compare team performance with detailed statistics.</p>
+        </div>
+        <div class="feature-card">
+            <h4>Match Timeline</h4>
+            <p>See key events plotted on an interactive timeline.</p>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Handle the league search form submission
+    document.getElementById('league-search-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const leagueId = document.getElementById('league-select').value;
+        if (leagueId) {
+            window.location.href = `/league/${leagueId}/live-matches`;
+        }
+    });
+</script>
+{% endblock %}

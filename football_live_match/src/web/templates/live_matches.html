@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if league_name %}
+Live Matches - {{ league_name }} - Football Data Visualization
+{% else %}
+All Live Matches - Football Data Visualization
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<section class="live-matches">
+    {% if league_name %}
+    <h2>Live Matches - {{ league_name }}</h2>
+    {% else %}
+    <h2>All Live Matches</h2>
+    {% endif %}
+    
+    <div class="search-options">
+        <form id="league-filter-form" action="/league-search" method="get">
+            <label for="league-select">Filter by League:</label>
+            <select id="league-select" name="league_id">
+                <option value="">All Leagues</option>
+                <!-- This would be populated with available leagues -->
+            </select>
+            <button type="submit" class="button">Filter</button>
+        </form>
+    </div>
+    
+    <div class="matches-container">
+        {% if matches %}
+            {% for match in matches %}
+            <div class="match-card">
+                <div class="match-header">
+                    <span class="league-name">{{ match.league_name }}</span>
+                    <span class="match-status {% if match.status_short in ['1H', '2H', 'HT'] %}live{% endif %}">
+                        {{ match.status }}
+                    </span>
+                </div>
+                
+                <div class="match-teams">
+                    <div class="team home-team">
+                        {% if match.home_logo %}
+                        <img src="{{ match.home_logo }}" alt="{{ match.home_team }} logo" class="team-logo">
+                        {% endif %}
+                        <span class="team-name">{{ match.home_team }}</span>
+                    </div>
+                    
+                    <div class="match-score">
+                        <span class="score">{{ match.score_home }} - {{ match.score_away }}</span>
+                        <span class="halftime">HT: {{ match.halftime_score }}</span>
+                    </div>
+                    
+                    <div class="team away-team">
+                        {% if match.away_logo %}
+                        <img src="{{ match.away_logo }}" alt="{{ match.away_team }} logo" class="team-logo">
+                        {% endif %}
+                        <span class="team-name">{{ match.away_team }}</span>
+                    </div>
+                </div>
+                
+                <div class="match-footer">
+                    <a href="/match/{{ match.match_id }}" class="button">View Details</a>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-matches">
+                <p>No live matches found at the moment.</p>
+                {% if league_name %}
+                <p>There are currently no live matches in {{ league_name }}.</p>
+                <a href="/live-matches" class="button">View All Live Matches</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+    
+    <div class="auto-refresh">
+        <p>This page automatically refreshes every 60 seconds to show the latest match data.</p>
+        <button id="manual-refresh" class="button">Refresh Now</button>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Auto-refresh the page every 60 seconds
+    const refreshInterval = 60000; // 60 seconds
+    let refreshTimer = setInterval(function() {
+        location.reload();
+    }, refreshInterval);
+    
+    // Manual refresh button
+    document.getElementById('manual-refresh').addEventListener('click', function() {
+        location.reload();
+    });
+    
+    // Handle the league filter form
+    document.getElementById('league-filter-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const leagueId = document.getElementById('league-select').value;
+        if (leagueId) {
+            window.location.href = `/league/${leagueId}/live-matches`;
+        } else {
+            window.location.href = '/live-matches';
+        }
+    });
+    
+    // Fetch leagues for the dropdown
+    fetch('/api/leagues')
+        .then(response => response.json())
+        .then(data => {
+            const leagueSelect = document.getElementById('league-select');
+            if (data && data.response) {
+                data.response.forEach(item => {
+                    const league = item.league;
+                    const option = document.createElement('option');
+                    option.value = league.id;
+                    option.textContent = `${league.name} (${item.country.name})`;
+                    
+                    // If we're on a league-specific page, select that league
+                    {% if league_id %}
+                    if (league.id == {{ league_id }}) {
+                        option.selected = true;
+                    }
+                    {% endif %}
+                    
+                    leagueSelect.appendChild(option);
+                });
+            }
+        })
+        .catch(error => console.error('Error fetching leagues:', error));
+</script>
+{% endblock %}

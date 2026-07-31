@@ -1,0 +1,655 @@
+{% extends "base.html" %}
+
+{% block title %}{{ match.home_team }} vs {{ match.away_team }} - Match Details{% endblock %}
+
+{% block content %}
+<section class="match-details">
+    <div class="match-header">
+        <h2>{{ match.home_team }} vs {{ match.away_team }}</h2>
+        <div class="match-meta">
+            <span class="league">{{ match.league_name }}</span>
+            <span class="status {% if match.status_short in ['1H', '2H', 'HT'] %}live{% endif %}">
+                {{ match.status }}
+            </span>
+        </div>
+    </div>
+
+    <div class="match-scoreboard">
+        <div class="team home-team">
+            {% if match.home_logo %}
+            <img src="{{ match.home_logo }}" alt="{{ match.home_team }} logo" class="team-logo">
+            {% endif %}
+            <h3>{{ match.home_team }}</h3>
+        </div>
+
+        <div class="score-display">
+            <div class="current-score">{{ match.score_home }} - {{ match.score_away }}</div>
+            <div class="halftime">Halftime: {{ match.halftime_score }}</div>
+        </div>
+
+        <div class="team away-team">
+            {% if match.away_logo %}
+            <img src="{{ match.away_logo }}" alt="{{ match.away_team }} logo" class="team-logo">
+            {% endif %}
+            <h3>{{ match.away_team }}</h3>
+        </div>
+    </div>
+
+    <div class="match-tabs">
+        <button class="tab-button active" data-tab="statistics">Statistics</button>
+        <button class="tab-button" data-tab="events">Match Events</button>
+        <button class="tab-button" data-tab="visualizations">Visualizations</button>
+    </div>
+
+    <div class="tab-content">
+        <!-- Statistics Tab -->
+        <div id="statistics" class="tab-pane active">
+            <h3>Match Statistics</h3>
+
+            <div id="stats-loading" class="loading-indicator">
+                <div class="spinner"></div>
+                <p>Loading match statistics...</p>
+            </div>
+
+            <div id="stats-content" style="display: none;">
+                <div class="stats-container">
+                    <table class="stats-table">
+                        <thead>
+                            <tr>
+                                <th>{{ match.home_team }}</th>
+                                <th>Statistic</th>
+                                <th>{{ match.away_team }}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stats-table-body">
+                            <!-- Will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="stats-charts">
+                    <div class="chart-container">
+                        <canvas id="possessionChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="shotsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div id="stats-error" style="display: none;">
+                <p>No statistics available for this match yet.</p>
+                <button id="retry-stats" class="button">Retry</button>
+            </div>
+        </div>
+
+        <!-- Events Tab -->
+        <div id="events" class="tab-pane">
+            <h3>Match Events</h3>
+
+            <div id="events-loading" class="loading-indicator">
+                <div class="spinner"></div>
+                <p>Loading match events...</p>
+            </div>
+
+            <div id="events-content" style="display: none;">
+                <div class="timeline" id="events-timeline">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <div id="events-error" style="display: none;">
+                <p>No events recorded for this match yet.</p>
+                <button id="retry-events" class="button">Retry</button>
+            </div>
+        </div>
+
+        <!-- Visualizations Tab -->
+        <div id="visualizations" class="tab-pane">
+            <h3>Match Visualizations</h3>
+
+            <div id="viz-loading" class="loading-indicator">
+                <div class="spinner"></div>
+                <p>Loading visualizations...</p>
+            </div>
+
+            <div id="viz-content" style="display: none;">
+                <div class="visualization-grid">
+                    <div class="viz-card">
+                        <h4>Possession</h4>
+                        <div class="chart-container">
+                            <canvas id="possessionPieChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="viz-card">
+                        <h4>Shots Comparison</h4>
+                        <div class="chart-container">
+                            <canvas id="shotsBarChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="viz-card">
+                        <h4>Passes Completed</h4>
+                        <div class="chart-container">
+                            <canvas id="passesChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="viz-card">
+                        <h4>Cards</h4>
+                        <div class="chart-container">
+                            <canvas id="cardsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="viz-error" style="display: none;">
+                <p>No data available for visualizations.</p>
+                <button id="retry-viz" class="button">Retry</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="auto-refresh">
+        <p>This page automatically refreshes every 60 seconds to show the latest match data.</p>
+        <button id="manual-refresh" class="button">Refresh Now</button>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Tab switching functionality
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            // Remove active class from all buttons and panes
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabPanes.forEach(pane => pane.classList.remove('active'));
+
+            // Add active class to clicked button and corresponding pane
+            button.classList.add('active');
+            const tabId = button.getAttribute('data-tab');
+            document.getElementById(tabId).classList.add('active');
+        });
+    });
+
+    // Auto-refresh the page every 60 seconds
+    const refreshInterval = 60000; // 60 seconds
+    let refreshTimer = setInterval(function() {
+        location.reload();
+    }, refreshInterval);
+
+    // Manual refresh button
+    document.getElementById('manual-refresh').addEventListener('click', function() {
+        location.reload();
+    });
+
+    // Match details
+    const matchId = "{{ match.match_id }}";
+    const homeTeam = "{{ match.home_team }}";
+    const awayTeam = "{{ match.away_team }}";
+    const homeColor = '#3366cc';
+    const awayColor = '#dc3545';
+
+    // Fetch match statistics
+    fetchMatchStatistics();
+
+    // Fetch match events
+    fetchMatchEvents();
+
+    // Retry buttons
+    document.getElementById('retry-stats').addEventListener('click', function() {
+        fetchMatchStatistics();
+    });
+
+    document.getElementById('retry-viz').addEventListener('click', function() {
+        fetchMatchStatistics();
+    });
+
+    document.getElementById('retry-events').addEventListener('click', function() {
+        fetchMatchEvents();
+    });
+
+    // When switching to visualizations tab, make sure charts are visible
+    document.querySelector('.tab-button[data-tab="visualizations"]').addEventListener('click', function() {
+        const vizLoading = document.getElementById('viz-loading');
+        const vizContent = document.getElementById('viz-content');
+        const vizError = document.getElementById('viz-error');
+
+        // If statistics are already loaded, show visualizations
+        if (document.getElementById('stats-content').style.display === 'block') {
+            vizLoading.style.display = 'none';
+            vizContent.style.display = 'block';
+            vizError.style.display = 'none';
+        } else if (document.getElementById('stats-error').style.display === 'block') {
+            // If statistics failed to load, show error
+            vizLoading.style.display = 'none';
+            vizContent.style.display = 'none';
+            vizError.style.display = 'block';
+        } else {
+            // If statistics are still loading, show loading
+            vizLoading.style.display = 'block';
+            vizContent.style.display = 'none';
+            vizError.style.display = 'none';
+        }
+    });
+
+    // When switching to events tab, check if events are loaded
+    document.querySelector('.tab-button[data-tab="events"]').addEventListener('click', function() {
+        // If events content is not visible and error is not visible, try fetching events
+        if (document.getElementById('events-content').style.display !== 'block' &&
+            document.getElementById('events-error').style.display !== 'block') {
+            fetchMatchEvents();
+        }
+    });
+
+    /**
+     * Fetches match statistics from the API and updates the UI
+     */
+    async function fetchMatchStatistics() {
+        const statsLoading = document.getElementById('stats-loading');
+        const statsContent = document.getElementById('stats-content');
+        const statsError = document.getElementById('stats-error');
+        const statsTableBody = document.getElementById('stats-table-body');
+
+        // Show loading, hide content and error
+        statsLoading.style.display = 'block';
+        statsContent.style.display = 'none';
+        statsError.style.display = 'none';
+
+        try {
+            const response = await fetch(`/api/match/${matchId}/statistics`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch match statistics');
+            }
+
+            const data = await response.json();
+            if (!data.statistics || Object.keys(data.statistics).length === 0) {
+                throw new Error('No statistics available');
+            }
+
+            // Process statistics data
+            const statistics = data.statistics;
+
+            // Make sure both teams are in the statistics
+            if (!statistics[homeTeam] || !statistics[awayTeam]) {
+                throw new Error('Statistics for one or both teams are missing');
+            }
+
+            const homeStats = statistics[homeTeam].statistics || {};
+            const awayStats = statistics[awayTeam].statistics || {};
+
+            // Populate statistics table
+            statsTableBody.innerHTML = '';
+
+            // Get all unique stat types
+            const allStatTypes = new Set([
+                ...Object.keys(homeStats),
+                ...Object.keys(awayStats)
+            ]);
+
+            // Create table rows for each stat type
+            allStatTypes.forEach(statType => {
+                const homeValue = homeStats[statType] || '-';
+                const awayValue = awayStats[statType] || '-';
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${homeValue}</td>
+                    <td>${statType}</td>
+                    <td>${awayValue}</td>
+                `;
+                statsTableBody.appendChild(row);
+            });
+
+            // Create charts
+            createCharts(homeStats, awayStats);
+
+            // Show content, hide loading and error for statistics tab
+            statsLoading.style.display = 'none';
+            statsContent.style.display = 'block';
+            statsError.style.display = 'none';
+
+            // Also update visualizations tab
+            const vizLoading = document.getElementById('viz-loading');
+            const vizContent = document.getElementById('viz-content');
+            const vizError = document.getElementById('viz-error');
+
+            vizLoading.style.display = 'none';
+            vizContent.style.display = 'block';
+            vizError.style.display = 'none';
+
+        } catch (error) {
+            console.error('Error fetching match statistics:', error);
+
+            // Show error, hide loading and content for statistics tab
+            statsLoading.style.display = 'none';
+            statsContent.style.display = 'none';
+            statsError.style.display = 'block';
+
+            // Also update visualizations tab
+            const vizLoading = document.getElementById('viz-loading');
+            const vizContent = document.getElementById('viz-content');
+            const vizError = document.getElementById('viz-error');
+
+            vizLoading.style.display = 'none';
+            vizContent.style.display = 'none';
+            vizError.style.display = 'block';
+        }
+    }
+
+    /**
+     * Creates charts for match statistics
+     */
+    function createCharts(homeStats, awayStats) {
+        // Possession Pie Chart
+        const possessionCtx = document.getElementById('possessionChart').getContext('2d');
+        new Chart(possessionCtx, {
+            type: 'pie',
+            data: {
+                labels: [homeTeam, awayTeam],
+                datasets: [{
+                    data: [
+                        parseStatValue(homeStats['Ball Possession']),
+                        parseStatValue(awayStats['Ball Possession'])
+                    ],
+                    backgroundColor: [homeColor, awayColor],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Ball Possession (%)'
+                    }
+                }
+            }
+        });
+
+        // Shots Bar Chart
+        const shotsCtx = document.getElementById('shotsChart').getContext('2d');
+        new Chart(shotsCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Total Shots', 'Shots on Goal', 'Shots off Goal'],
+                datasets: [
+                    {
+                        label: homeTeam,
+                        data: [
+                            parseStatValue(homeStats['Total Shots']),
+                            parseStatValue(homeStats['Shots on Goal']),
+                            parseStatValue(homeStats['Shots off Goal'])
+                        ],
+                        backgroundColor: homeColor
+                    },
+                    {
+                        label: awayTeam,
+                        data: [
+                            parseStatValue(awayStats['Total Shots']),
+                            parseStatValue(awayStats['Shots on Goal']),
+                            parseStatValue(awayStats['Shots off Goal'])
+                        ],
+                        backgroundColor: awayColor
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Create visualizations tab charts
+        createVisualizationCharts(homeStats, awayStats);
+    }
+
+    /**
+     * Creates charts for the visualizations tab
+     */
+    function createVisualizationCharts(homeStats, awayStats) {
+        // Possession Pie Chart
+        const possessionPieCtx = document.getElementById('possessionPieChart').getContext('2d');
+        new Chart(possessionPieCtx, {
+            type: 'pie',
+            data: {
+                labels: [homeTeam, awayTeam],
+                datasets: [{
+                    data: [
+                        parseStatValue(homeStats['Ball Possession']),
+                        parseStatValue(awayStats['Ball Possession'])
+                    ],
+                    backgroundColor: [homeColor, awayColor],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Ball Possession (%)'
+                    }
+                }
+            }
+        });
+
+        // Shots Bar Chart
+        const shotsBarCtx = document.getElementById('shotsBarChart').getContext('2d');
+        new Chart(shotsBarCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Total Shots', 'Shots on Goal', 'Shots off Goal'],
+                datasets: [
+                    {
+                        label: homeTeam,
+                        data: [
+                            parseStatValue(homeStats['Total Shots']),
+                            parseStatValue(homeStats['Shots on Goal']),
+                            parseStatValue(homeStats['Shots off Goal'])
+                        ],
+                        backgroundColor: homeColor
+                    },
+                    {
+                        label: awayTeam,
+                        data: [
+                            parseStatValue(awayStats['Total Shots']),
+                            parseStatValue(awayStats['Shots on Goal']),
+                            parseStatValue(awayStats['Shots off Goal'])
+                        ],
+                        backgroundColor: awayColor
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Passes Chart
+        const passesCtx = document.getElementById('passesChart').getContext('2d');
+        new Chart(passesCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Passes', 'Accurate Passes'],
+                datasets: [
+                    {
+                        label: homeTeam,
+                        data: [
+                            parseStatValue(homeStats['Passes']),
+                            parseStatValue(homeStats['Accurate Passes'])
+                        ],
+                        backgroundColor: homeColor
+                    },
+                    {
+                        label: awayTeam,
+                        data: [
+                            parseStatValue(awayStats['Passes']),
+                            parseStatValue(awayStats['Accurate Passes'])
+                        ],
+                        backgroundColor: awayColor
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Cards Chart
+        const cardsCtx = document.getElementById('cardsChart').getContext('2d');
+        new Chart(cardsCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Yellow Cards', 'Red Cards'],
+                datasets: [
+                    {
+                        label: homeTeam,
+                        data: [
+                            parseStatValue(homeStats['Yellow Cards']),
+                            parseStatValue(homeStats['Red Cards'])
+                        ],
+                        backgroundColor: homeColor
+                    },
+                    {
+                        label: awayTeam,
+                        data: [
+                            parseStatValue(awayStats['Yellow Cards']),
+                            parseStatValue(awayStats['Red Cards'])
+                        ],
+                        backgroundColor: awayColor
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Fetches match events from the API and updates the UI
+     */
+    async function fetchMatchEvents() {
+        const eventsLoading = document.getElementById('events-loading');
+        const eventsContent = document.getElementById('events-content');
+        const eventsError = document.getElementById('events-error');
+        const eventsTimeline = document.getElementById('events-timeline');
+
+        // Show loading, hide content and error
+        eventsLoading.style.display = 'block';
+        eventsContent.style.display = 'none';
+        eventsError.style.display = 'none';
+
+        try {
+            const response = await fetch(`/api/match/${matchId}/events`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch match events');
+            }
+
+            const data = await response.json();
+            if (!data.events || data.events.length === 0) {
+                throw new Error('No events available');
+            }
+
+            // Process events data
+            const events = data.events;
+
+            // Clear existing events
+            eventsTimeline.innerHTML = '';
+
+            // Add events to timeline
+            events.forEach(event => {
+                const eventElement = document.createElement('div');
+                eventElement.className = `event ${event.team_name === homeTeam ? 'home' : 'away'}`;
+
+                const timeDisplay = event.extra_time
+                    ? `${event.time}'${event.extra_time > 0 ? '+' + event.extra_time : ''}`
+                    : `${event.time}'`;
+
+                eventElement.innerHTML = `
+                    <div class="event-time">${timeDisplay}</div>
+                    <div class="event-icon ${event.type.toLowerCase()}"></div>
+                    <div class="event-details">
+                        <strong>${event.player_name || 'Unknown Player'}</strong>
+                        <span class="event-type">${event.type}</span>
+                        <span class="event-team">${event.team_name}</span>
+                    </div>
+                `;
+
+                eventsTimeline.appendChild(eventElement);
+            });
+
+            // Show content, hide loading and error
+            eventsLoading.style.display = 'none';
+            eventsContent.style.display = 'block';
+            eventsError.style.display = 'none';
+
+        } catch (error) {
+            console.error('Error fetching match events:', error);
+
+            // Show error, hide loading and content
+            eventsLoading.style.display = 'none';
+            eventsContent.style.display = 'none';
+            eventsError.style.display = 'block';
+        }
+    }
+
+    /**
+     * Parses a statistic value to a number
+     */
+    function parseStatValue(value) {
+        if (value === undefined || value === null || value === '-') {
+            return 0;
+        }
+
+        if (typeof value === 'number') {
+            return value;
+        }
+
+        // Handle percentage strings
+        if (typeof value === 'string' && value.includes('%')) {
+            return parseFloat(value.replace('%', '')) || 0;
+        }
+
+        return parseFloat(value) || 0;
+    }
+</script>
+{% endblock %}
